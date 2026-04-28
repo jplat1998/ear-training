@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ear Training Pro</title>
+
+<style>
+body {
+    font-family: sans-serif;
+    background: #0f0f0f;
+    color: #fff;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    margin: 0;
+}
+
+.container {
+    text-align: center;
+    background: #1a1a1a;
+    padding: 2rem;
+    border-radius: 20px;
+    width: 90%;
+    max-width: 400px;
+}
+
+#display {
+    font-size: 4rem;
+    margin: 20px 0;
+    color: #bb86fc;
+}
+
+button {
+    width: 100%;
+    padding: 15px;
+    margin-top: 10px;
+    font-size: 1rem;
+    border-radius: 10px;
+    border: none;
+}
+
+#start { background: #03dac6; }
+#reveal { background: #bb86fc; }
+#replay { background: #333; color: white; }
+
+.timer {
+    height: 6px;
+    background: #333;
+    margin-top: 20px;
+}
+
+.progress {
+    height: 100%;
+    width: 0%;
+    background: #03dac6;
+}
+</style>
+
+</head>
+
+<body>
+
+<div class="container">
+    <h2>Ear Training</h2>
+    <div id="display">READY</div>
+
+```
+<button id="start">Start / Pause</button>
+<button id="reveal">Reveal</button>
+<button id="replay">Replay Note</button>
+
+<div class="timer"><div class="progress" id="progress"></div></div>
+```
+
+</div>
+
+<script>
+const noteNames = ['C','D','E','F','G','A','B'];
+
+const baseFrequencies = {
+    C: 130.81,
+    D: 146.83,
+    E: 164.81,
+    F: 174.61,
+    G: 196.00,
+    A: 220.00,
+    B: 246.94
+};
+
+let ctx;
+let current;
+let running = false;
+let time = 0;
+let mode = "idle";
+
+const display = document.getElementById("display");
+const progress = document.getElementById("progress");
+
+function audioInit() {
+    if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+}
+
+// Piano-like sound
+function playPiano(freq) {
+    audioInit();
+    const now = ctx.currentTime;
+
+    const harmonics = [1, 2, 3, 4, 5, 6];
+    const gains = [0.5, 0.25, 0.15, 0.1, 0.05, 0.03];
+
+    harmonics.forEach((h, i) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+
+        osc.frequency.value = freq * h + (Math.random() * 2 - 1);
+        osc.type = i === 0 ? "sine" : "triangle";
+
+        gain.gain.setValueAtTime(0, now);
+        gain.gain.linearRampToValueAtTime(gains[i], now + 0.01);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 2.5);
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+
+        osc.start(now);
+        osc.stop(now + 2.6);
+    });
+}
+
+// Random octave selection
+function getRandomNote() {
+    const name = noteNames[Math.floor(Math.random() * noteNames.length)];
+    let freq = baseFrequencies[name];
+
+    const octaveShift = [1, 2, 0.5][Math.floor(Math.random() * 3)];
+    freq *= octaveShift;
+
+    return { name, freq };
+}
+
+function nextNote() {
+    current = getRandomNote();
+    playPiano(current.freq);
+    display.innerText = "GUESS";
+    display.style.color = "#bb86fc";
+    mode = "guess";
+    time = 0;
+}
+
+function loop() {
+    if (!running) return;
+
+    time += 16;
+
+    if (mode === "guess") {
+        progress.style.width = (time / 7000) * 100 + "%";
+        if (time > 7000) reveal();
+    }
+
+    if (mode === "reveal") {
+        if (time > 3000) nextNote();
+    }
+
+    requestAnimationFrame(loop);
+}
+
+function startPause() {
+    running = !running;
+    if (running) {
+        if (!current) nextNote();
+        loop();
+    }
+}
+
+function reveal() {
+    display.innerText = current.name;
+    display.style.color = "#03dac6";
+    playPiano(current.freq);
+    mode = "reveal";
+    time = 0;
+}
+
+document.getElementById("start").onclick = startPause;
+document.getElementById("reveal").onclick = reveal;
+document.getElementById("replay").onclick = () => {
+    if (current) playPiano(current.freq);
+};
+</script>
+
+</body>
+</html>
